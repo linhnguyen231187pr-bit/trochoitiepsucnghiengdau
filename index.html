@@ -1,0 +1,1789 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Nghiêng Đầu Tiếp Sức</title>
+    
+    <!-- CDNs cho File Word và Thống Kê -->
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+    
+    <!-- Google Fonts cho nét chữ dễ thương -->
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;800;900&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-main: #eef2f6;
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --ans-a-border: #a5d8ff;
+            --ans-a-bg: #e0f2fe;
+            --ans-b-border: #bbf7d0;
+            --ans-b-bg: #dcfce7;
+            --success: #22c55e;
+            --danger: #ef4444;
+            --text-dark: #334155;
+            --text-muted: #64748b;
+            --radius-lg: 30px;
+            --radius-md: 16px;
+            --font-main: 'Nunito', sans-serif;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: var(--font-main); }
+        
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-dark);
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+            background-image: linear-gradient(135deg, #eef2f6 0%, #dbeafe 100%);
+        }
+
+        #game-view {
+            display: flex; flex-direction: column; width: 100%; height: 100%;
+            padding: 15px 335px 15px 30px; gap: 15px;
+            position: relative;
+        }
+
+        header { display: flex; justify-content: space-between; align-items: center; position: relative; z-index: 100; }
+        .header-title { font-size: 1.5rem; font-weight: 900; color: var(--primary); }
+        .controls { display: flex; gap: 10px; align-items: center; }
+        .team-timer {
+            padding: 9px 16px; border-radius: 16px; background: #0f172a; color: white;
+            font-size: 1.1rem; font-weight: 900; letter-spacing: 1px; min-width: 145px; text-align: center;
+            box-shadow: 0 4px 10px rgba(15,23,42,.18);
+        }
+        .current-team-pill {
+            padding: 9px 14px; border-radius: 16px; background: #fff7ed; color: #c2410c;
+            border: 2px solid #fdba74; font-size: .95rem; font-weight: 900; max-width: 190px;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .live-scoreboard {
+            position: absolute; top: 74px; right: 18px; bottom: 18px; width: 295px; z-index: 40;
+            border-radius: 24px; background: #0f172a; color: #e2e8f0; padding: 18px 14px 14px;
+            box-shadow: 0 18px 45px rgba(15,23,42,.25); border: 1px solid rgba(148,163,184,.18);
+            display: flex; flex-direction: column; overflow: hidden;
+        }
+        .scoreboard-title { color: #facc15; font-size: 1.12rem; font-weight: 900; text-align: center; letter-spacing: .5px; margin-bottom: 5px; }
+        .scoreboard-note { color: #94a3b8; font-size: .7rem; font-weight: 800; text-align: center; margin-bottom: 12px; }
+        .scoreboard-head {
+            display: grid; grid-template-columns: 28px minmax(0,1fr) 62px 74px; gap: 6px; align-items:center;
+            padding: 0 7px 7px; color: #22d3ee; font-size: .68rem; font-weight: 900; text-transform: uppercase;
+        }
+        #scoreboard-rows { overflow-y: auto; padding-right: 2px; }
+        .score-row {
+            display: grid; grid-template-columns: 28px minmax(0,1fr) 62px 74px; gap: 6px; align-items:center;
+            min-height: 47px; margin-bottom: 7px; padding: 7px; border-radius: 12px; background: #172033;
+            border: 1px solid transparent; transition: .2s ease;
+        }
+        .score-row.active { border-color: #facc15; background: #1f2937; box-shadow: inset 3px 0 0 #facc15; }
+        .score-row.done { background: #182237; }
+        .score-rank { text-align:center; font-weight: 900; color: #cbd5e1; }
+        .score-name { min-width:0; font-weight:900; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .score-points { color:#fbbf24; font-weight:900; text-align:center; }
+        .score-time { color:#67e8f9; font-weight:900; text-align:right; font-size:.76rem; font-variant-numeric: tabular-nums; }
+        .score-status { color:#94a3b8; font-size:.65rem; font-weight:800; }
+        .team-setup {
+            width: min(720px, 92vw); margin: 8px auto 0; background: rgba(255,255,255,.96); border:1px solid #dbeafe;
+            border-radius: 20px; padding: 15px 18px; box-shadow: 0 10px 30px rgba(15,23,42,.08);
+        }
+        .team-setup-title { font-size:1rem; font-weight:900; color:#0f172a; margin-bottom:8px; }
+        .team-edit-list { display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:8px; max-height:170px; overflow-y:auto; padding:2px; }
+        .team-edit-row { display:flex; gap:7px; align-items:center; }
+        .team-edit-row input { flex:1; min-width:0; padding:8px 10px; border:1px solid #cbd5e1; border-radius:10px; font-weight:800; font-size:.95rem; }
+        .team-remove { width:36px; height:36px; border:none; border-radius:10px; background:#fee2e2; color:#dc2626; font-weight:900; cursor:pointer; }
+        .team-add-row { display:flex; gap:8px; margin-top:10px; }
+        .team-add-row input { flex:1; padding:9px 11px; border:1px solid #cbd5e1; border-radius:10px; font-size:1rem; }
+        .team-mini-btn { border:none; border-radius:10px; padding:9px 14px; background:#0ea5e9; color:white; font-weight:900; cursor:pointer; }
+        .final-ranking { width:min(720px,90vw); margin: 12px auto 0; }
+        .final-rank-row { display:grid; grid-template-columns:48px minmax(0,1fr) 110px 130px; gap:10px; align-items:center; background:white; padding:11px 14px; border-radius:14px; margin:7px 0; color:#334155; font-weight:900; box-shadow:0 4px 12px rgba(15,23,42,.07); }
+        .final-rank-row.winner { border:2px solid #facc15; background:#fffbeb; }
+        @media (max-width: 1180px) {
+            #game-view { padding-right: 265px; }
+            .live-scoreboard { width:230px; }
+            .scoreboard-head, .score-row { grid-template-columns: 24px minmax(0,1fr) 50px 66px; gap:4px; }
+            .camera-section { width:280px; }
+            .camera-border { width:230px; height:230px; }
+            .current-team-pill { display:none; }
+        }
+        .btn {
+            padding: 10px 20px; border-radius: var(--radius-md); border: none;
+            background: var(--primary); color: white; font-weight: bold; font-size: 1rem;
+            cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 6px rgba(59, 130, 246, 0.2);
+        }
+        .btn:hover { background: var(--primary-hover); transform: translateY(-2px); }
+
+        .question-container {
+            background: white; border-radius: var(--radius-lg);
+            text-align: center; padding: 20px 30px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            position: relative; z-index: 10;
+        }
+        .q-icon {
+            width: 60px; height: 60px; background: linear-gradient(135deg, #f59e0b, #fbbf24);
+            border-radius: 50%; display: flex; justify-content: center; align-items: center;
+            font-size: 1.8rem; color: white; margin-bottom: 10px;
+            box-shadow: 0 4px 10px rgba(245, 158, 11, 0.3);
+            border: 4px solid #fef3c7;
+        }
+        .q-meta { font-size: 1rem; color: var(--text-muted); font-weight: 800; position: absolute; top: 20px; right: 30px;}
+        .q-text { font-size: 1.8rem; font-weight: 900; color: var(--text-dark); line-height: 1.4; }
+
+        .interaction-area {
+            display: flex; flex: 1; gap: 30px; align-items: stretch; justify-content: space-between;
+            margin-top: 10px;
+        }
+
+        .ans-btn {
+            flex: 1; border-radius: var(--radius-lg); border: 8px solid transparent;
+            position: relative; overflow: hidden; cursor: pointer; display: flex; flex-direction: column;
+            justify-content: center; align-items: center; padding: 20px; text-align: center;
+            background: white; box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .ans-a { border-color: var(--ans-a-border); }
+        .ans-a:hover { background-color: var(--ans-a-bg); }
+        .ans-b { border-color: var(--ans-b-border); }
+        .ans-b:hover { background-color: var(--ans-b-bg); }
+        
+        .ans-label {
+            position: absolute; top: 15px; left: 20px; right: 20px;
+            font-size: 1.1rem; font-weight: 900; color: var(--text-muted);
+            text-align: left;
+        }
+        .ans-b .ans-label { text-align: right; }
+        
+        .ans-text { font-size: 2rem; font-weight: 900; z-index: 2; color: var(--text-dark); }
+        .ans-content { width: 100%; height: 100%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; min-width:0; }
+        .answer-media { width:min(92%, 330px); max-height:190px; object-fit:contain; border-radius:18px; background:rgba(255,255,255,0.9); padding:6px; box-shadow:0 6px 16px rgba(15,23,42,0.12); z-index:2; }
+        .ans-btn.has-image .ans-text { font-size:1.55rem; line-height:1.25; }
+        .ans-btn.correct .answer-media, .ans-btn.wrong .answer-media { background:rgba(255,255,255,0.96); }
+
+        .builder-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+        .builder-answer-card { border:2px solid #e2e8f0; border-radius:18px; padding:16px; background:#f8fafc; }
+        .builder-answer-card.a { border-color:var(--ans-a-border); }
+        .builder-answer-card.b { border-color:var(--ans-b-border); }
+        .image-preview-box { min-height:120px; margin-top:10px; border:2px dashed #cbd5e1; border-radius:14px; display:flex; align-items:center; justify-content:center; padding:10px; background:white; color:var(--text-muted); text-align:center; }
+        .image-preview-box img { max-width:100%; max-height:170px; object-fit:contain; border-radius:10px; }
+        .builder-toolbar { display:flex; flex-wrap:wrap; gap:10px; margin-top:14px; }
+        .draft-list { display:flex; flex-direction:column; gap:10px; margin-top:14px; }
+        .draft-item { border:1px solid #e2e8f0; border-radius:14px; padding:12px 14px; display:grid; grid-template-columns:auto 1fr auto; gap:12px; align-items:center; background:white; }
+        .draft-num { width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; background:#dbeafe; color:#1d4ed8; font-weight:900; }
+        .draft-main { min-width:0; }
+        .draft-question { font-weight:900; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .draft-answers { color:var(--text-muted); font-size:.9rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:4px; }
+        .draft-actions { display:flex; gap:6px; }
+        .thumb-mark { display:inline-flex; align-items:center; gap:4px; padding:2px 7px; border-radius:999px; background:#e2e8f0; font-size:.78rem; margin-left:5px; }
+        @media (max-width: 900px) { .builder-grid { grid-template-columns:1fr; } .answer-media { max-height:145px; } }
+        
+        .ans-btn.active { transform: scale(1.02); box-shadow: 0 15px 35px rgba(0,0,0,0.1); }
+        .ans-btn.correct { background: var(--success); border-color: #16a34a; color: white !important; animation: pulse 0.5s; }
+        .ans-btn.correct .ans-text, .ans-btn.correct .ans-label { color: white; }
+        .ans-btn.wrong { background: var(--danger); border-color: #dc2626; opacity: 0.7; }
+        .ans-btn.wrong .ans-text, .ans-btn.wrong .ans-label { color: white; }
+
+        @keyframes pulse { 0% {transform: scale(1);} 50% {transform: scale(1.05);} 100% {transform: scale(1);} }
+
+        .camera-section {
+            width: 350px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+            gap: 20px;
+        }
+        
+        .camera-border {
+            width: 280px; height: 280px; border-radius: 50%;
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6, #ec4899);
+            padding: 8px; box-shadow: 0 15px 35px rgba(59, 130, 246, 0.3);
+            animation: rotateBorder 4s linear infinite;
+        }
+        @keyframes rotateBorder { 0% { filter: hue-rotate(0deg); } 100% { filter: hue-rotate(360deg); } }
+
+        .camera-circle {
+            width: 100%; height: 100%; border-radius: 50%;
+            overflow: hidden; background: #000; position: relative;
+        }
+        #video-feed { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+        #canvas-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transform: scaleX(-1); pointer-events: none; }
+        
+        .status-box {
+            background: white; border-radius: var(--radius-md); padding: 15px 25px;
+            text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.05); width: 100%;
+        }
+        #cam-state-text { font-size: 1.1rem; font-weight: 900; color: var(--text-dark); margin-bottom: 5px;}
+        #cam-angle-text { font-size: 0.85rem; color: var(--text-muted); font-weight: 600;}
+        
+        .status-progress-bg {
+            width: 100%; height: 8px; background: #e2e8f0; border-radius: 10px;
+            margin-top: 10px; overflow: hidden; position: relative;
+        }
+        .status-progress-fill {
+            height: 100%; width: 0%; background: var(--primary);
+            border-radius: 10px; transition: width 0.1s linear, background-color 0.2s;
+        }
+
+        .bottom-helpers { display: flex; justify-content: center; gap: 15px; padding-bottom: 10px; }
+        .badge { padding: 6px 15px; border-radius: 20px; font-size: 0.9rem; font-weight: 800; }
+        .badge.yellow { background: #fef08a; color: #854d0e; }
+        .badge.green { background: #bbf7d0; color: #166534; }
+        .badge.purple { background: #e9d5ff; color: #6b21a8; }
+
+        .overlay-screen {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(255,255,255,0.9); z-index: 50; display: flex; flex-direction: column;
+            justify-content: center; align-items: center; text-align: center; backdrop-filter: blur(10px);
+        }
+        .overlay-screen h1 { font-size: 3rem; margin-bottom: 20px; color: var(--primary); font-weight: 900;}
+        .overlay-screen p { font-size: 1.5rem; margin-bottom: 30px; font-weight: 800; color: var(--text-dark); }
+        .hidden { display: none !important; }
+
+        #admin-modal {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: var(--bg-main); z-index: 100; display: flex; flex-direction: column;
+        }
+        .admin-header {
+            padding: 20px 30px; background: white; border-bottom: 1px solid #e2e8f0;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .admin-layout { display: flex; flex: 1; overflow: hidden; background: white; }
+        .admin-sidebar { width: 250px; background: #f8fafc; padding: 20px 0; border-right: 1px solid #e2e8f0; }
+        .tab-btn {
+            display: block; width: 100%; text-align: left; padding: 15px 30px; background: none;
+            border: none; color: var(--text-muted); font-size: 1.1rem; cursor: pointer; transition: 0.2s; font-weight: 800;
+        }
+        .tab-btn:hover { background: #e2e8f0; color: var(--text-dark); }
+        .tab-btn.active { background: var(--primary); color: white; border-left: 4px solid var(--primary-hover);}
+        .admin-content { flex: 1; padding: 30px; overflow-y: auto; color: var(--text-dark); }
+        .panel { display: none; } .panel.active { display: block; }
+        .card { background: white; padding: 20px; border-radius: var(--radius-md); margin-bottom: 20px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px rgba(0,0,0,0.05);}
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 8px; color: var(--text-dark); font-weight: 800;}
+        .form-control { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 1rem; }
+        .btn-sm { padding: 6px 12px; font-size: 0.9rem; }
+        .btn-danger { background: var(--danger); } .btn-danger:hover { background: #dc2626; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+        th { background: #f8fafc; color: var(--text-muted); font-weight: 900;}
+
+        #auth-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 200; display: flex; justify-content: center; align-items: center; }
+        .auth-box { background: white; padding: 40px; border-radius: var(--radius-lg); text-align: center; width: 400px; box-shadow: 0 20px 50px rgba(0,0,0,0.2);}
+        .auth-box input { margin: 20px 0; text-align: center; letter-spacing: 5px; font-size: 1.5rem; }
+
+        #toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 999; display: flex; flex-direction: column; gap: 10px; }
+        .toast { background: white; color: var(--text-dark); padding: 15px 25px; border-radius: 8px; font-weight: 800; box-shadow: 0 10px 25px rgba(0,0,0,0.1); border-left: 5px solid var(--primary); animation: slideIn 0.3s forwards, slideOut 0.3s 2.7s forwards; }
+        .toast.success { border-color: var(--success); } .toast.error { border-color: var(--danger); }
+        @keyframes slideIn { from {transform: translateX(100%); opacity:0;} to {transform: translateX(0); opacity:1;} }
+        @keyframes slideOut { from {transform: translateX(0); opacity:1;} to {transform: translateX(100%); opacity:0;} }
+    </style>
+</head>
+<body>
+
+    <div id="game-view">
+        <header>
+            <div class="header-title">🎮 GAME NGHIÊNG ĐẦU TIẾP SỨC</div>
+            <div class="controls">
+                <div class="current-team-pill" id="current-team-pill">👥 Chưa bắt đầu</div>
+                <div class="team-timer" id="team-timer">⏱️ 00:00.000</div>
+                <button class="btn" onclick="window.UI.showSetsModal()" id="btn-select-set">📚 Chọn Bộ Câu Hỏi</button>
+                <button class="btn" onclick="window.Game.toggleFullscreen()" title="Toàn màn hình">⛶</button>
+                <button class="btn" onclick="window.Admin.openAuth()">⚙️ Quản trị</button>
+            </div>
+        </header>
+
+        <div class="question-container">
+            <div class="q-icon">🎧</div>
+            <div class="q-meta" id="q-meta">Chế độ Test</div>
+            <div class="q-text" id="q-text">Nghe thật kỹ rồi nghiêng đầu để chọn nha!</div>
+        </div>
+
+        <div class="interaction-area">
+            <div class="ans-btn ans-a" id="ans-a" onclick="window.Game.submitAnswer('A', 'click')">
+                <div class="ans-label">← TRÁI</div>
+                <div class="ans-content">
+                    <img id="img-a" class="answer-media hidden" alt="Hình minh họa đáp án A">
+                    <div class="ans-text" id="text-a">Đáp án A</div>
+                </div>
+            </div>
+
+            <div class="camera-section">
+                <div class="camera-border">
+                    <div class="camera-circle" id="camera-container">
+                        <video id="video-feed" autoplay playsinline></video>
+                        <canvas id="canvas-overlay"></canvas>
+                    </div>
+                </div>
+                <div class="status-box">
+                    <div id="cam-state-text">Đang khởi động Camera...</div>
+                    <div id="cam-angle-text">Vui lòng chờ AI</div>
+                    <div class="status-progress-bg">
+                        <div class="status-progress-fill" id="status-progress"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="ans-btn ans-b" id="ans-b" onclick="window.Game.submitAnswer('B', 'click')">
+                <div class="ans-label">PHẢI →</div>
+                <div class="ans-content">
+                    <img id="img-b" class="answer-media hidden" alt="Hình minh họa đáp án B">
+                    <div class="ans-text" id="text-b">Đáp án B</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bottom-helpers">
+            <span class="badge yellow">Nghiêng trái = chọn ô trái</span>
+            <span class="badge green">Nghiêng phải = chọn ô phải</span>
+            <span class="badge purple">Có thể bấm trực tiếp</span>
+        </div>
+
+        <aside id="live-scoreboard" class="live-scoreboard" aria-label="Bảng điểm trực tiếp">
+            <div class="scoreboard-title">👑 BẢNG ĐIỂM TRỰC TIẾP</div>
+            <div class="scoreboard-note">Ưu tiên điểm cao • hòa điểm: đội nhanh hơn xếp trên</div>
+            <div class="scoreboard-head"><span>#</span><span>ĐỘI</span><span>ĐIỂM</span><span>THỜI GIAN</span></div>
+            <div id="scoreboard-rows"></div>
+        </aside>
+    </div>
+
+    <div id="start-overlay" class="overlay-screen">
+        <h1 id="start-title">CHƯA CHỌN BỘ CÂU HỎI</h1>
+        <p id="start-desc">Giáo viên chọn bộ câu hỏi, đặt tên các đội rồi bắt đầu thi đấu.</p>
+        <div class="team-setup" id="team-setup">
+            <div class="team-setup-title">👥 CÁC ĐỘI THI ĐẤU <span style="color:#64748b;font-size:.82rem;">(tối đa 10 đội)</span></div>
+            <div id="team-edit-list" class="team-edit-list"></div>
+            <div class="team-add-row">
+                <input id="new-team-name" type="text" maxlength="30" placeholder="Tên đội mới, ví dụ: NHÓM 5">
+                <button class="team-mini-btn" type="button" onclick="window.Competition.addTeamFromInput()">＋ Thêm đội</button>
+            </div>
+        </div>
+        <div style="display: flex; gap: 20px; margin-top: 12px;">
+            <button class="btn" style="font-size: 1.2rem; padding: 15px 30px; border-radius: 30px; background: var(--success);" onclick="window.UI.showSetsModal()">📚 CHỌN BỘ CÂU HỎI</button>
+            <button class="btn" style="font-size: 1.2rem; padding: 15px 30px; border-radius: 30px; box-shadow: 0 10px 20px rgba(59,130,246,0.3);" id="btn-start-game" onclick="window.Game.startSession()" disabled>▶ BẮT ĐẦU CHƠI</button>
+        </div>
+    </div>
+
+    <div id="message-overlay" class="overlay-screen hidden">
+        <h1 id="msg-title">👏 Cảm ơn!</h1>
+        <p id="msg-desc">Mời bạn tiếp theo bước vào.</p>
+        <button class="btn hidden" id="btn-manual-next" onclick="window.Game.manualNext()" style="font-size: 1.2rem; padding: 12px 30px; border-radius: 20px;">👋 Bắt đầu lượt tiếp theo</button>
+        <div id="msg-actions" style="display:flex;gap:10px;margin-top:18px;justify-content:center;flex-wrap:wrap;"></div>
+    </div>
+
+    <div id="admin-modal" class="hidden">
+        <div class="admin-header">
+            <div class="header-title">⚙️ Quản Trị Hệ Thống</div>
+            <button class="btn btn-danger" onclick="window.Admin.close()">Đóng</button>
+        </div>
+        <div class="admin-layout">
+            <div class="admin-sidebar">
+                <button class="tab-btn active" onclick="window.Admin.switchTab('tab-sets')">📚 Bộ câu hỏi</button>
+                <button class="tab-btn" onclick="window.Admin.switchTab('tab-import')">📥 Nhập Word</button>
+                <button class="tab-btn" onclick="window.Admin.switchTab('tab-builder')">✍️ Tự tạo câu hỏi</button>
+                <button class="tab-btn" onclick="window.Admin.switchTab('tab-settings')">🎮 Cài đặt game</button>
+                <button class="tab-btn" onclick="window.Admin.switchTab('tab-stats')">📊 Thống kê</button>
+                <button class="tab-btn" onclick="window.Admin.switchTab('tab-backup')">💾 Dữ liệu</button>
+            </div>
+            <div class="admin-content">
+                <div id="tab-sets" class="panel active">
+                    <h2>Danh sách Bộ câu hỏi</h2>
+                    <div id="sets-list-container" style="margin-top:20px;"></div>
+                </div>
+
+                <div id="tab-import" class="panel">
+                    <h2>Nhập từ file Word (.docx)</h2>
+                    <div class="card" style="margin-top:20px;">
+                        <input type="file" id="word-upload" accept=".docx" class="form-control" onchange="window.WordParser.handleUpload(event)">
+                    </div>
+                    <div id="import-preview" class="hidden">
+                        <h3>Xem trước dữ liệu</h3>
+                        <p id="import-stats" style="color: var(--primary); margin-bottom: 15px; font-weight:bold;"></p>
+                        <div class="form-group">
+                            <label>Tên bộ câu hỏi:</label>
+                            <input type="text" id="import-set-name" class="form-control" placeholder="Ví dụ: Kiểm tra 15p Sinh Học 10">
+                        </div>
+                        <div style="overflow-x:auto;">
+                            <table id="import-table">
+                                <thead><tr><th>STT</th><th>Câu hỏi</th><th>A</th><th>B</th><th>Đáp án</th><th>Lỗi</th></tr></thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                        <div style="margin-top: 20px; display:flex; gap:10px;">
+                            <button class="btn" onclick="window.WordParser.saveImport()">💾 Lưu thành bộ câu hỏi mới</button>
+                            <button class="btn btn-danger" onclick="window.WordParser.cancelImport()">Hủy</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="tab-builder" class="panel">
+                    <h2>✍️ Tự tạo bộ câu hỏi</h2>
+                    <div class="card" style="margin-top:20px;">
+                        <div class="form-group">
+                            <label>Tên bộ câu hỏi</label>
+                            <input type="text" id="builder-set-name" class="form-control" placeholder="Ví dụ: Nhận biết chất - Hóa 12">
+                        </div>
+                        <div class="form-group">
+                            <label>Nội dung câu hỏi</label>
+                            <textarea id="builder-question" class="form-control" rows="3" placeholder="Nhập câu hỏi..."></textarea>
+                        </div>
+
+                        <div class="builder-grid">
+                            <div class="builder-answer-card a">
+                                <h3>← Đáp án A / bên TRÁI</h3>
+                                <div class="form-group" style="margin-top:10px;">
+                                    <label>Nội dung chữ (có thể để trống nếu chỉ dùng ảnh)</label>
+                                    <input type="text" id="builder-a" class="form-control" placeholder="Đáp án A">
+                                </div>
+                                <div class="form-group">
+                                    <label>Hình ảnh đáp án A (tùy chọn)</label>
+                                    <input type="file" id="builder-img-a-file" class="form-control" accept="image/*" onchange="window.QuestionBuilder.handleImage('A', event)">
+                                    <div class="image-preview-box" id="builder-img-a-preview">Chưa có hình ảnh</div>
+                                    <button type="button" class="btn btn-sm btn-danger hidden" id="builder-img-a-remove" style="margin-top:8px;" onclick="window.QuestionBuilder.removeImage('A')">Xóa ảnh A</button>
+                                </div>
+                            </div>
+
+                            <div class="builder-answer-card b">
+                                <h3>Đáp án B / bên PHẢI →</h3>
+                                <div class="form-group" style="margin-top:10px;">
+                                    <label>Nội dung chữ (có thể để trống nếu chỉ dùng ảnh)</label>
+                                    <input type="text" id="builder-b" class="form-control" placeholder="Đáp án B">
+                                </div>
+                                <div class="form-group">
+                                    <label>Hình ảnh đáp án B (tùy chọn)</label>
+                                    <input type="file" id="builder-img-b-file" class="form-control" accept="image/*" onchange="window.QuestionBuilder.handleImage('B', event)">
+                                    <div class="image-preview-box" id="builder-img-b-preview">Chưa có hình ảnh</div>
+                                    <button type="button" class="btn btn-sm btn-danger hidden" id="builder-img-b-remove" style="margin-top:8px;" onclick="window.QuestionBuilder.removeImage('B')">Xóa ảnh B</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group" style="margin-top:16px; max-width:320px;">
+                            <label>Đáp án đúng</label>
+                            <select id="builder-correct" class="form-control">
+                                <option value="A">A - Bên trái</option>
+                                <option value="B">B - Bên phải</option>
+                            </select>
+                        </div>
+                        <div class="builder-toolbar">
+                            <button type="button" class="btn" id="builder-add-btn" onclick="window.QuestionBuilder.addOrUpdateQuestion()">➕ Thêm câu hỏi</button>
+                            <button type="button" class="btn btn-danger" onclick="window.QuestionBuilder.clearForm()">Làm trống câu đang nhập</button>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+                            <h3>Danh sách câu đã tạo <span id="builder-count" style="color:var(--primary);">(0)</span></h3>
+                            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                                <button type="button" class="btn" onclick="window.QuestionBuilder.saveSet()">💾 Lưu bộ câu hỏi</button>
+                                <button type="button" class="btn btn-danger" onclick="window.QuestionBuilder.resetAll()">🗑️ Xóa bản nháp</button>
+                            </div>
+                        </div>
+                        <div id="builder-draft-list" class="draft-list">
+                            <div style="color:var(--text-muted);">Chưa có câu hỏi nào. Hãy tạo câu đầu tiên ở phía trên.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="tab-settings" class="panel">
+                    <h2>Cài đặt Game</h2>
+                    <div class="card" style="max-width: 600px; margin-top:20px;">
+                        <div class="form-group">
+                            <label>Ngưỡng nghiêng đầu (độ)</label>
+                            <input type="number" id="set-threshold" class="form-control" min="5" max="30">
+                        </div>
+                        <div class="form-group">
+                            <label>Thời gian giữ đầu để chốt (ms)</label>
+                            <input type="number" id="set-hold" class="form-control" min="250" max="3000">
+                        </div>
+                        <div class="form-group">
+                            <label>Thời gian hiệu chuẩn đầu thẳng cho mỗi học sinh (ms)</label>
+                            <input type="number" id="set-calib" class="form-control" min="250" max="3000">
+                        </div>
+                        <div class="form-group">
+                            <label>Chế độ chuyển lượt</label>
+                            <select id="set-autonext" class="form-control">
+                                <option value="true">Tự động</option>
+                                <option value="false">Giáo viên điều khiển (Phím Space)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Âm thanh</label>
+                            <select id="set-sound" class="form-control">
+                                <option value="true">Bật</option>
+                                <option value="false">Tắt</option>
+                            </select>
+                        </div>
+<!-- THÊM MỚI TỪ ĐÂY -->
+                        <div class="form-group">
+                            <label>Ảnh nền (Tùy chọn JPG/PNG)</label>
+                            <input type="file" id="set-bg" class="form-control" accept="image/*">
+                        </div>
+                        <div class="form-group">
+                            <label>Nhạc nền game (.mp3 vui nhộn)</label>
+                            <input type="file" id="set-sound-bgm" class="form-control" accept="audio/*">
+                        </div>
+                        <div class="form-group">
+                            <label>Nhạc khi trả lời ĐÚNG (.mp3)</label>
+                            <input type="file" id="set-sound-correct" class="form-control" accept="audio/*">
+                        </div>
+                        <div class="form-group">
+                            <label>Nhạc khi trả lời SAI (.mp3)</label>
+                            <input type="file" id="set-sound-wrong" class="form-control" accept="audio/*">
+                        </div>
+                        <!-- KẾT THÚC THÊM MỚI -->
+                        <button class="btn" onclick="window.Admin.saveSettings()">💾 Lưu Cài Đặt</button>
+                        <button class="btn btn-danger" onclick="window.Admin.resetSettings()" style="margin-left: 10px;">Mặc định</button>
+                    </div>
+                </div>
+
+                <div id="tab-stats" class="panel"><h2>Thống kê</h2><p>Vui lòng xem ở phiên bản đầy đủ.</p></div>
+                <div id="tab-backup" class="panel">
+                    <h2>Quản lý dữ liệu</h2>
+                    <div class="card" style="margin-top:20px;">
+                        <h3>Sao lưu dữ liệu (Dự phòng)</h3>
+                        <p style="color:var(--text-muted); font-size:0.9rem; margin-bottom:10px;">Tải về máy toàn bộ cài đặt và các bộ câu hỏi đang có dưới dạng file .json.</p>
+                        <button class="btn" onclick="window.Storage.exportAll()">📥 Xuất dữ liệu (.json)</button>
+                    </div>
+                    <div class="card">
+                        <h3>Khôi phục dữ liệu</h3>
+                        <p style="color:var(--text-muted); font-size:0.9rem; margin-bottom:10px;">Chọn file .json đã xuất trước đó để khôi phục lại các bộ câu hỏi (không cần file Word nữa).</p>
+                        <input type="file" id="json-upload" accept=".json" class="form-control" onchange="window.Storage.importAll(event)">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="select-set-modal" class="overlay-screen hidden" style="background: rgba(255,255,255,0.95); z-index: 60;">
+        <div class="card" style="width: 500px; max-width: 90%; text-align:left;">
+            <h2>Chọn Bộ Câu Hỏi</h2>
+            <div id="modal-sets-list" style="max-height: 300px; overflow-y:auto; margin: 15px 0;"></div>
+            <div style="display:flex; justify-content:flex-end;"><button class="btn btn-danger" onclick="window.UI.hideSetsModal()">Đóng</button></div>
+        </div>
+    </div>
+
+    <div id="auth-modal" class="hidden">
+        <div class="auth-box">
+            <h2 style="color:var(--primary); font-weight:900;">Mật Khẩu Quản Trị</h2>
+            <input type="password" id="auth-pass" class="form-control" placeholder="Mặc định: Hoahoc12">
+            <div style="display:flex; justify-content:center; gap:10px;">
+                <button class="btn" onclick="window.Admin.login()">Đăng Nhập</button>
+                <button class="btn btn-danger" onclick="window.Admin.closeAuth()">Hủy</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast-container"></div>
+    
+    <!-- Audio player cho nhạc nền tùy chỉnh -->
+    <audio id="bgm-player" loop></audio>
+
+    <!-- CHUYỂN SANG DÙNG ES MODULE ĐỂ LÁCH BẢO MẬT BROWSER KHI CHẠY OFFLINE -->
+    <script type="module">
+        import { FaceLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3";
+
+        "use strict";
+        
+        // Ẩn thông báo INFO nội bộ của TensorFlow Lite WebAssembly bị nhận diện nhầm là lỗi
+        const originalConsoleError = console.error;
+        console.error = function(...args) {
+            if (args.length > 0 && typeof args[0] === 'string' && args[0].includes('TensorFlow Lite XNNPACK delegate')) return;
+            originalConsoleError.apply(console, args);
+        };
+        const originalConsoleWarn = console.warn;
+        console.warn = function(...args) {
+            if (args.length > 0 && typeof args[0] === 'string' && args[0].includes('TensorFlow Lite XNNPACK delegate')) return;
+            originalConsoleWarn.apply(console, args);
+        };
+
+        const Utils = {
+            $: id => document.getElementById(id),
+            toast: (msg, type = 'success') => {
+                const container = Utils.$('toast-container');
+                const t = document.createElement('div');
+                t.className = `toast ${type}`; t.innerText = msg;
+                container.appendChild(t); setTimeout(() => t.remove(), 3000);
+            },
+            generateId: () => Math.random().toString(36).substr(2, 9),
+            deepClone: (obj) => JSON.parse(JSON.stringify(obj)),
+            fileToBase64: (file) => new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = error => reject(error);
+            }),
+            escapeHTML: (value) => String(value ?? '').replace(/[&<>\"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#039;'}[ch])),
+            imageFileToBase64: async (file) => {
+                if(!file || !file.type.startsWith('image/')) throw new Error('Tệp không phải hình ảnh');
+                if(file.size > 12 * 1024 * 1024) throw new Error('Ảnh quá lớn (tối đa 12 MB)');
+                const src = await Utils.fileToBase64(file);
+                const img = await new Promise((resolve, reject) => {
+                    const el = new Image();
+                    el.onload = () => resolve(el);
+                    el.onerror = reject;
+                    el.src = src;
+                });
+                const maxW = 1000, maxH = 700;
+                const scale = Math.min(1, maxW / img.naturalWidth, maxH / img.naturalHeight);
+                const canvas = document.createElement('canvas');
+                canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+                canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                try { return canvas.toDataURL('image/webp', 0.84); }
+                catch(e) { return canvas.toDataURL('image/jpeg', 0.86); }
+            }
+        };
+
+        const AudioSvc = {
+            ctx: null, isPlayingBGM: false, nextNoteTime: 0, bgmStep: 0, bgmTimer: null,
+            init() { if(!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); if(this.ctx.state === 'suspended') this.ctx.resume(); },
+            play(type) {
+                if(!App.settings.sound) return;
+                
+                // KIỂM TRA NHẠC TÙY CHỈNH
+                if (type === 'correct' && App.settings.soundCorrect) {
+                    new Audio(App.settings.soundCorrect).play().catch(e => console.log("Audio play error"));
+                    return; 
+                }
+                if (type === 'wrong' && App.settings.soundWrong) {
+                    new Audio(App.settings.soundWrong).play().catch(e => console.log("Audio play error"));
+                    return; 
+                }
+                
+                // NHẠC MẶC ĐỊNH
+                try {
+                    this.init(); const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+                    osc.connect(gain); gain.connect(this.ctx.destination);
+                    let freq = 400, typeW = 'sine', duration = 0.1, vol = 1;
+                    if(type === 'correct') { freq = 800; typeW = 'sine'; duration = 0.4; vol = 1; }
+                    else if(type === 'wrong') { freq = 200; typeW = 'sawtooth'; duration = 0.5; vol = 1; }
+                    else if(type === 'ready') { freq = 600; typeW = 'square'; duration = 0.2; vol = 0.5; }
+                    else if(type === 'tick') { freq = 1000; typeW = 'sine'; duration = 0.05; vol = 0.1; }
+                    osc.type = typeW; osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                    if(type === 'correct') osc.frequency.exponentialRampToValueAtTime(1200, this.ctx.currentTime + duration);
+                    gain.gain.setValueAtTime(vol, this.ctx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + duration);
+                    osc.start(this.ctx.currentTime); osc.stop(this.ctx.currentTime + duration);
+                } catch(e) {}
+            },
+            startBGM() {
+                if(!App.settings.sound) return;
+                this.init();
+                const customBgmPlayer = Utils.$('bgm-player');
+                // Nếu giáo viên có tải nhạc riêng
+                if (App.settings.soundBgm && customBgmPlayer) {
+                    if(customBgmPlayer.src !== App.settings.soundBgm) customBgmPlayer.src = App.settings.soundBgm;
+                    customBgmPlayer.volume = 0.4;
+                    customBgmPlayer.play().catch(e => console.log("Lỗi chạy BGM custom"));
+                    return;
+                }
+                // Nếu không có, dùng nhạc Synth 8-bit vui nhộn mặc định
+                if(this.isPlayingBGM) return;
+                this.isPlayingBGM = true;
+                this.bgmStep = 0;
+                this.nextNoteTime = this.ctx.currentTime + 0.1;
+                this.scheduleBGM();
+            },
+            stopBGM() {
+                this.isPlayingBGM = false;
+                clearTimeout(this.bgmTimer);
+                const customBgmPlayer = Utils.$('bgm-player');
+                if(customBgmPlayer) customBgmPlayer.pause();
+            },
+            scheduleBGM() {
+                if (!this.isPlayingBGM) return;
+                while (this.nextNoteTime < this.ctx.currentTime + 0.1) {
+                    this.playBGMNote(this.bgmStep);
+                    this.nextNoteTime += 0.25 * (60.0 / 140); // 140 BPM cực sôi động
+                    this.bgmStep = (this.bgmStep + 1) % 32;
+                }
+                this.bgmTimer = setTimeout(() => this.scheduleBGM(), 25);
+            },
+            playBGMNote(step) {
+                // Tiếng nhịp trống dập (Kick drum)
+                if (step % 4 === 0) {
+                    const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+                    osc.connect(gain); gain.connect(this.ctx.destination);
+                    osc.frequency.setValueAtTime(150, this.nextNoteTime); osc.frequency.exponentialRampToValueAtTime(10, this.nextNoteTime + 0.1);
+                    gain.gain.setValueAtTime(0.25, this.nextNoteTime); gain.gain.exponentialRampToValueAtTime(0.01, this.nextNoteTime + 0.1);
+                    osc.start(this.nextNoteTime); osc.stop(this.nextNoteTime + 0.1);
+                }
+                // Giai điệu Arpeggio vui nhộn tạo cảm giác gấp gáp
+                const melody = [261.63, 329.63, 392.00, 523.25, 392.00, 329.63, 392.00, 0,
+                                349.23, 440.00, 523.25, 698.46, 523.25, 440.00, 523.25, 0,
+                                261.63, 329.63, 392.00, 523.25, 392.00, 329.63, 392.00, 0,
+                                392.00, 349.23, 329.63, 293.66, 261.63, 0, 0, 0];
+                const freq = melody[step];
+                if (freq > 0) {
+                    const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+                    osc.type = 'triangle'; osc.connect(gain); gain.connect(this.ctx.destination);
+                    osc.frequency.value = freq;
+                    gain.gain.setValueAtTime(0.05, this.nextNoteTime); gain.gain.exponentialRampToValueAtTime(0.01, this.nextNoteTime + 0.1);
+                    osc.start(this.nextNoteTime); osc.stop(this.nextNoteTime + 0.15);
+                }
+            }
+        };
+
+        const Storage = {
+            dbName: 'SmartQuizDB_V2', version: 1, db: null,
+            init() {
+                return new Promise((resolve, reject) => {
+                    const req = indexedDB.open(this.dbName, this.version);
+                    req.onupgradeneeded = (e) => {
+                        const db = e.target.result;
+                        if(!db.objectStoreNames.contains('config')) db.createObjectStore('config');
+                        if(!db.objectStoreNames.contains('sets')) db.createObjectStore('sets', {keyPath: 'id'});
+                        if(!db.objectStoreNames.contains('sessions')) db.createObjectStore('sessions', {keyPath: 'id'});
+                    };
+                    req.onsuccess = (e) => { this.db = e.target.result; resolve(); };
+                    req.onerror = (e) => reject(e);
+                });
+            },
+            _tx(storeName, mode) { return this.db.transaction(storeName, mode).objectStore(storeName); },
+            async get(store, key) { return new Promise((res, rej) => { const req = this._tx(store, 'readonly').get(key); req.onsuccess = () => res(req.result); req.onerror = () => rej(req.error); }); },
+            async set(store, keyOrData, val) { return new Promise((res, rej) => { const os = this._tx(store, 'readwrite'); const req = (store === 'config') ? os.put(val, keyOrData) : os.put(keyOrData); req.onsuccess = () => res(); req.onerror = () => rej(req.error); }); },
+            async getAll(store) { return new Promise((res, rej) => { const req = this._tx(store, 'readonly').getAll(); req.onsuccess = () => res(req.result); req.onerror = () => rej(req.error); }); },
+            async delete(store, key) { return new Promise((res, rej) => { const req = this._tx(store, 'readwrite').delete(key); req.onsuccess = () => res(); req.onerror = () => rej(req.error); }); },
+            async exportAll() {
+                try {
+                    const sets = await this.getAll('sets'); const sessions = await this.getAll('sessions'); const settings = await this.get('config', 'settings');
+                    const data = { schema: 2, settings, sets, sessions };
+                    const blob = new Blob([JSON.stringify(data)], {type: 'application/json'});
+                    const url = URL.createObjectURL(blob); const a = document.createElement('a');
+                    a.href = url; a.download = `SmartQuiz_Backup_${new Date().toISOString().split('T')[0]}.json`; a.click(); Utils.toast("Xuất dữ liệu thành công!");
+                } catch(e) { Utils.toast("Lỗi xuất dữ liệu", 'error'); }
+            },
+            async importAll(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    try {
+                        const data = JSON.parse(e.target.result);
+                        if (!data.schema) throw new Error("File không hợp lệ");
+                        
+                        let setsCount = (data.sets && Array.isArray(data.sets)) ? data.sets.length : 0;
+                        if (setsCount === 0) {
+                            Utils.toast("Cảnh báo: File khôi phục KHÔNG có bộ câu hỏi nào!", "error");
+                        } else {
+                            Utils.toast(`Đang khôi phục ${setsCount} bộ câu hỏi...`);
+                        }
+
+                        if (data.settings) await this.set('config', 'settings', data.settings);
+                        if (data.sets && Array.isArray(data.sets)) {
+                            for (let set of data.sets) await this.set('sets', set);
+                        }
+                        if (data.sessions && Array.isArray(data.sessions)) {
+                            for (let session of data.sessions) await this.set('sessions', session);
+                        }
+                        
+                        if (setsCount > 0) Utils.toast("✅ Khôi phục thành công!");
+                        
+                        // Cập nhật lại giao diện ngay lập tức
+                        if (window.Admin) {
+                            window.Admin.loadSets();
+                            window.Admin.renderMiniSetsList();
+                        }
+                    } catch (err) {
+                        Utils.toast("Lỗi file dữ liệu, có thể file không đúng định dạng", "error");
+                        console.error(err);
+                    }
+                    event.target.value = '';
+                };
+                reader.readAsText(file);
+            }
+        };
+
+        const WordParser = {
+            currentPreview: null,
+            async handleUpload(e) {
+                const file = e.target.files[0]; if(!file) return;
+                Utils.toast("Đang đọc file Word...");
+                try {
+                    const zip = await JSZip.loadAsync(file);
+                    const docXml = await zip.file("word/document.xml").async("text");
+                    const parser = new DOMParser(); const xmlDoc = parser.parseFromString(docXml, "text/xml");
+                    const questions = this.parseXML(xmlDoc); this.renderPreview(questions);
+                } catch(err) { Utils.toast("Lỗi đọc file", "error"); }
+            },
+            parseXML(xmlDoc) {
+                const paras = xmlDoc.getElementsByTagName("w:p"); let questions = []; let currentQ = null; let qTextBuffer = [];
+                const analyzePara = (p) => {
+                    let text = ""; let hasUnderlineAtStart = false;
+                    const runs = p.getElementsByTagName("w:r"); let charIndex = 0;
+                    for(let r of runs) {
+                        const tNodes = r.getElementsByTagName("w:t"); let rText = "";
+                        for(let t of tNodes) rText += t.textContent;
+                        const rPr = r.getElementsByTagName("w:rPr")[0]; const u = rPr ? rPr.getElementsByTagName("w:u")[0] : null;
+                        let isUnderlined = u && u.getAttribute("w:val") !== "none";
+                        if(isUnderlined && charIndex <= 2) { if(rText.trim().startsWith("A") || rText.trim().startsWith("B")) hasUnderlineAtStart = true; }
+                        text += rText; charIndex += rText.length;
+                    }
+                    return { text: text.trim(), u: hasUnderlineAtStart };
+                };
+                for(let i=0; i<paras.length; i++) {
+                    const { text, u } = analyzePara(paras[i]); if(!text) continue;
+                    if(/^Câu\s*\d+\s*:/i.test(text)) {
+                        if(currentQ) { currentQ.q = qTextBuffer.join('\n'); questions.push(currentQ); }
+                        currentQ = { q: "", a: "", b: "", correct: null, error: null }; qTextBuffer = [text];
+                    } else if (currentQ) {
+                        if(text.startsWith("A.") || text.startsWith("A ")) {
+                            currentQ.a = text.replace(/^A\.\s*|^A\s*/, '');
+                            if(u) { if(currentQ.correct) currentQ.error = "Cả 2 đều gạch chân"; else currentQ.correct = 'A'; }
+                        }
+                        else if(text.startsWith("B.") || text.startsWith("B ")) {
+                            currentQ.b = text.replace(/^B\.\s*|^B\s*/, '');
+                            if(u) { if(currentQ.correct) currentQ.error = "Cả 2 đều gạch chân"; else currentQ.correct = 'B'; }
+                        } else { if(!currentQ.a && !currentQ.b) qTextBuffer.push(text); }
+                    }
+                }
+                if(currentQ) { currentQ.q = qTextBuffer.join('\n'); questions.push(currentQ); }
+                questions.forEach(q => { if(!q.a || !q.b) q.error = "Thiếu A hoặc B"; else if(!q.correct) q.error = "Không có đáp án gạch chân"; });
+                return questions;
+            },
+            renderPreview(questions) {
+                this.currentPreview = questions; const tbody = Utils.$('import-table').querySelector('tbody'); tbody.innerHTML = ''; let errors = 0;
+                questions.forEach((q, idx) => {
+                    if(q.error) errors++;
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `<td>${idx+1}</td><td>${q.q}</td><td>${q.a}</td><td>${q.b}</td><td>${q.correct || '?'}</td><td style="color:var(--danger)">${q.error || ''}</td>`;
+                    tbody.appendChild(tr);
+                });
+                Utils.$('import-stats').innerText = `Tìm thấy: ${questions.length} câu | Lỗi: ${errors}`;
+                Utils.$('import-preview').classList.remove('hidden');
+            },
+            async saveImport() {
+                if(!this.currentPreview || this.currentPreview.length===0) return;
+                const name = Utils.$('import-set-name').value.trim() || `Bộ câu hỏi ${new Date().toLocaleString()}`;
+                if(this.currentPreview.some(q => q.error)) { if(!confirm("Hệ thống chỉ lưu các câu hợp lệ. Tiếp tục?")) return; }
+                const validQs = this.currentPreview.filter(q => !q.error).map(q => ({ id: Utils.generateId(), q: q.q, a: q.a, b: q.b, correct: q.correct, imageA: '', imageB: '' }));
+                if(validQs.length === 0) return Utils.toast("Không có câu hợp lệ", "error");
+                const set = { id: Utils.generateId(), name, createdAt: Date.now(), questions: validQs };
+                await Storage.set('sets', set); Utils.toast("Đã lưu bộ câu hỏi!"); this.cancelImport(); Admin.loadSets();
+            },
+            cancelImport() { this.currentPreview = null; Utils.$('import-preview').classList.add('hidden'); Utils.$('word-upload').value = ''; Utils.$('import-set-name').value = ''; }
+        };
+
+        const QuestionBuilder = {
+            draft: [], editIndex: -1, imageA: '', imageB: '', editingSetId: null, editingCreatedAt: null,
+
+            async handleImage(side, event) {
+                const file = event.target.files && event.target.files[0];
+                if(!file) return;
+                try {
+                    Utils.toast('Đang xử lý ảnh...');
+                    const data = await Utils.imageFileToBase64(file);
+                    if(side === 'A') this.imageA = data; else this.imageB = data;
+                    this.renderImagePreview(side);
+                    Utils.toast(`Đã thêm ảnh đáp án ${side}`);
+                } catch(err) {
+                    event.target.value = '';
+                    Utils.toast(err?.message || 'Không đọc được ảnh', 'error');
+                }
+            },
+
+            renderImagePreview(side) {
+                const data = side === 'A' ? this.imageA : this.imageB;
+                const key = side.toLowerCase();
+                const box = Utils.$(`builder-img-${key}-preview`);
+                const removeBtn = Utils.$(`builder-img-${key}-remove`);
+                if(!box || !removeBtn) return;
+                if(data) {
+                    box.innerHTML = '';
+                    const img = document.createElement('img');
+                    img.src = data; img.alt = `Xem trước ảnh đáp án ${side}`;
+                    box.appendChild(img);
+                    removeBtn.classList.remove('hidden');
+                } else {
+                    box.textContent = 'Chưa có hình ảnh';
+                    removeBtn.classList.add('hidden');
+                }
+            },
+
+            removeImage(side) {
+                if(side === 'A') this.imageA = ''; else this.imageB = '';
+                const inp = Utils.$(`builder-img-${side.toLowerCase()}-file`);
+                if(inp) inp.value = '';
+                this.renderImagePreview(side);
+            },
+
+            clearForm() {
+                Utils.$('builder-question').value = '';
+                Utils.$('builder-a').value = '';
+                Utils.$('builder-b').value = '';
+                Utils.$('builder-correct').value = 'A';
+                this.imageA = ''; this.imageB = ''; this.editIndex = -1;
+                ['a','b'].forEach(k => { const inp = Utils.$(`builder-img-${k}-file`); if(inp) inp.value = ''; });
+                this.renderImagePreview('A'); this.renderImagePreview('B');
+                const btn = Utils.$('builder-add-btn'); if(btn) btn.innerText = '➕ Thêm câu hỏi';
+            },
+
+            addOrUpdateQuestion() {
+                const q = Utils.$('builder-question').value.trim();
+                const a = Utils.$('builder-a').value.trim();
+                const b = Utils.$('builder-b').value.trim();
+                const correct = Utils.$('builder-correct').value;
+                if(!q) return Utils.toast('Hãy nhập nội dung câu hỏi', 'error');
+                if(!a && !this.imageA) return Utils.toast('Đáp án A cần có chữ hoặc hình ảnh', 'error');
+                if(!b && !this.imageB) return Utils.toast('Đáp án B cần có chữ hoặc hình ảnh', 'error');
+                const existing = this.editIndex >= 0 ? this.draft[this.editIndex] : null;
+                const item = { id: existing?.id || Utils.generateId(), q, a, b, correct, imageA: this.imageA || '', imageB: this.imageB || '' };
+                if(this.editIndex >= 0) {
+                    this.draft[this.editIndex] = item;
+                    Utils.toast('Đã cập nhật câu hỏi');
+                } else {
+                    this.draft.push(item);
+                    Utils.toast(`Đã thêm câu ${this.draft.length}`);
+                }
+                this.renderDraft();
+                this.clearForm();
+                Utils.$('builder-question').focus();
+            },
+
+            editQuestion(index) {
+                const item = this.draft[index]; if(!item) return;
+                this.editIndex = index;
+                Utils.$('builder-question').value = item.q || '';
+                Utils.$('builder-a').value = item.a || '';
+                Utils.$('builder-b').value = item.b || '';
+                Utils.$('builder-correct').value = item.correct || 'A';
+                this.imageA = item.imageA || ''; this.imageB = item.imageB || '';
+                this.renderImagePreview('A'); this.renderImagePreview('B');
+                Utils.$('builder-add-btn').innerText = `💾 Cập nhật câu ${index + 1}`;
+                Utils.$('builder-question').scrollIntoView({behavior:'smooth', block:'center'});
+                Utils.$('builder-question').focus();
+            },
+
+            deleteQuestion(index) {
+                if(index < 0 || index >= this.draft.length) return;
+                this.draft.splice(index, 1);
+                if(this.editIndex === index) this.clearForm();
+                else if(this.editIndex > index) this.editIndex--;
+                this.renderDraft();
+            },
+
+            moveQuestion(index, delta) {
+                const next = index + delta;
+                if(index < 0 || next < 0 || index >= this.draft.length || next >= this.draft.length) return;
+                [this.draft[index], this.draft[next]] = [this.draft[next], this.draft[index]];
+                if(this.editIndex === index) this.editIndex = next;
+                else if(this.editIndex === next) this.editIndex = index;
+                this.renderDraft();
+            },
+
+            renderDraft() {
+                const list = Utils.$('builder-draft-list');
+                const count = Utils.$('builder-count');
+                if(count) count.innerText = `(${this.draft.length})`;
+                if(!list) return;
+                if(this.draft.length === 0) {
+                    list.innerHTML = '<div style="color:var(--text-muted);">Chưa có câu hỏi nào. Hãy tạo câu đầu tiên ở phía trên.</div>';
+                    return;
+                }
+                list.innerHTML = this.draft.map((item, idx) => {
+                    const aLabel = item.a ? Utils.escapeHTML(item.a) : 'Chỉ dùng ảnh';
+                    const bLabel = item.b ? Utils.escapeHTML(item.b) : 'Chỉ dùng ảnh';
+                    const imgA = item.imageA ? '<span class="thumb-mark">🖼️ A</span>' : '';
+                    const imgB = item.imageB ? '<span class="thumb-mark">🖼️ B</span>' : '';
+                    return `<div class="draft-item">
+                        <div class="draft-num">${idx + 1}</div>
+                        <div class="draft-main">
+                            <div class="draft-question">${Utils.escapeHTML(item.q)}</div>
+                            <div class="draft-answers">A: ${aLabel}${imgA} &nbsp; | &nbsp; B: ${bLabel}${imgB} &nbsp; • &nbsp; Đúng: <strong>${item.correct}</strong></div>
+                        </div>
+                        <div class="draft-actions">
+                            <button type="button" class="btn btn-sm" title="Lên" onclick="window.QuestionBuilder.moveQuestion(${idx}, -1)" ${idx===0?'disabled':''}>↑</button>
+                            <button type="button" class="btn btn-sm" title="Xuống" onclick="window.QuestionBuilder.moveQuestion(${idx}, 1)" ${idx===this.draft.length-1?'disabled':''}>↓</button>
+                            <button type="button" class="btn btn-sm" onclick="window.QuestionBuilder.editQuestion(${idx})">Sửa</button>
+                            <button type="button" class="btn btn-sm btn-danger" onclick="window.QuestionBuilder.deleteQuestion(${idx})">Xóa</button>
+                        </div>
+                    </div>`;
+                }).join('');
+            },
+
+            async loadSet(id) {
+                try {
+                    const set = await Storage.get('sets', id);
+                    if(!set) return Utils.toast('Không tìm thấy bộ câu hỏi', 'error');
+                    this.editingSetId = set.id;
+                    this.editingCreatedAt = set.createdAt || Date.now();
+                    this.draft = Utils.deepClone((set.questions || []).map(q => ({
+                        id: q.id || Utils.generateId(), q: q.q || '', a: q.a || '', b: q.b || '',
+                        correct: (q.correct || 'A').toUpperCase(), imageA: q.imageA || '', imageB: q.imageB || ''
+                    })));
+                    Utils.$('builder-set-name').value = set.name || '';
+                    this.clearForm();
+                    this.renderDraft();
+                    Admin.activateTab('tab-builder');
+                    Utils.toast('Đã mở bộ câu hỏi để chỉnh sửa');
+                } catch(err) {
+                    console.error(err);
+                    Utils.toast('Không mở được bộ câu hỏi', 'error');
+                }
+            },
+
+            async saveSet() {
+                const name = Utils.$('builder-set-name').value.trim();
+                if(!name) return Utils.toast('Hãy nhập tên bộ câu hỏi', 'error');
+                if(this.draft.length === 0) return Utils.toast('Bộ câu hỏi chưa có câu nào', 'error');
+                const isEditing = !!this.editingSetId;
+                const set = { id: this.editingSetId || Utils.generateId(), name, createdAt: this.editingCreatedAt || Date.now(), updatedAt: Date.now(), source: 'manual', questions: Utils.deepClone(this.draft) };
+                try {
+                    await Storage.set('sets', set);
+                    Utils.toast(`${isEditing ? 'Đã cập nhật' : 'Đã lưu'} bộ “${name}” với ${this.draft.length} câu`);
+                    await Admin.loadSets();
+                    this.resetAll(false);
+                } catch(err) {
+                    console.error(err);
+                    Utils.toast('Không lưu được bộ câu hỏi. Có thể ảnh quá lớn hoặc bộ nhớ trình duyệt đã đầy.', 'error');
+                }
+            },
+
+            resetAll(ask = true) {
+                if(ask && this.draft.length && !confirm('Xóa toàn bộ bản nháp đang tạo?')) return;
+                this.draft = []; this.editIndex = -1; this.editingSetId = null; this.editingCreatedAt = null;
+                const name = Utils.$('builder-set-name'); if(name) name.value = '';
+                this.clearForm(); this.renderDraft();
+            }
+        };
+
+        const STATES = { IDLE: 'IDLE', WAITING_PLAYER: 'WAITING_PLAYER', CALIBRATING: 'CALIBRATING', READY: 'READY', HOLDING: 'HOLDING', LOCKED: 'LOCKED', WAITING_EXIT: 'WAITING_EXIT', ENDED: 'ENDED' };
+
+        const FaceTracker = {
+            faceLandmarker: null, video: null, canvas: null, ctx: null,
+            running: false, lastVideoTime: -1, smoothedRoll: 0, alpha: 0.48,
+
+            async init() {
+                if(this.running) return;
+                this.video = Utils.$('video-feed'); this.canvas = Utils.$('canvas-overlay'); this.ctx = this.canvas.getContext('2d');
+                Utils.$('cam-state-text').innerText = "Đang mở Camera...";
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: 480, height: 480 }, audio: false });
+                    this.video.srcObject = stream;
+                    this.video.addEventListener("loadeddata", () => {
+                        this.canvas.width = this.video.videoWidth; this.canvas.height = this.video.videoHeight;
+                        this.running = true;
+                        Utils.$('cam-state-text').innerText = "Đang tải AI nhận diện...";
+                        this.loadAI();
+                    });
+                } catch(e) { Utils.$('cam-state-text').innerText = "Lỗi Camera"; }
+            },
+
+            async loadAI() {
+                try {
+                    const wasmPath = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm");
+                    
+                    this.faceLandmarker = await FaceLandmarker.createFromOptions(wasmPath, {
+                        baseOptions: { 
+                            modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task", 
+                            delegate: "CPU"
+                        },
+                        outputFaceBlendshapes: false, runningMode: "VIDEO", numFaces: 2
+                    });
+                    
+                    Utils.$('cam-state-text').innerText = "Sẵn sàng (Đang Test)";
+                    this.predict();
+                } catch(e) { 
+                    console.error(e);
+                    Utils.$('cam-state-text').innerText = "Lỗi tải AI (Vui lòng thử lại)"; 
+                }
+            },
+
+            predict() {
+                if(!this.running) return;
+                let startTimeMs = performance.now();
+                if (this.lastVideoTime !== this.video.currentTime && this.video.currentTime > 0) {
+                    this.lastVideoTime = this.video.currentTime;
+                    if(this.faceLandmarker) {
+                        const results = this.faceLandmarker.detectForVideo(this.video, startTimeMs);
+                        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                        
+                        if(results.faceLandmarks && results.faceLandmarks.length > 0) {
+                            const count = results.faceLandmarks.length;
+                            if(count > 1) {
+                                Game.onFaceStateChange('MULTIPLE', 0);
+                            } else if(count === 1) {
+                                const leftEye = results.faceLandmarks[0][33]; 
+                                const rightEye = results.faceLandmarks[0][263];
+                                const dx = rightEye.x - leftEye.x;
+                                const dy = rightEye.y - leftEye.y;
+                                
+                                let rollRaw = Math.atan2(dy, dx) * (180 / Math.PI);
+                                this.smoothedRoll = this.alpha * rollRaw + (1 - this.alpha) * this.smoothedRoll;
+                                
+                                Game.onFaceStateChange('SINGLE', this.smoothedRoll);
+                                const shown = (Game.state === STATES.READY || Game.state === STATES.HOLDING || Game.state === STATES.WAITING_EXIT)
+                                    ? -(this.smoothedRoll - Game.neutralRoll)
+                                    : -this.smoothedRoll;
+                                Utils.$('cam-angle-text').innerText = `Góc nghiêng: ${shown.toFixed(1)}°`;
+
+                                this.ctx.strokeStyle = "rgba(255, 255, 255, 0.6)";
+                                this.ctx.lineWidth = 2;
+                                this.ctx.beginPath();
+                                this.ctx.moveTo(rightEye.x * this.canvas.width, rightEye.y * this.canvas.height);
+                                this.ctx.lineTo(leftEye.x * this.canvas.width, leftEye.y * this.canvas.height);
+                                this.ctx.stroke();
+                            } else Game.onFaceStateChange('NONE', 0);
+                        } else Game.onFaceStateChange('NONE', 0);
+                    }
+                }
+                requestAnimationFrame(() => this.predict());
+            },
+            stop() { this.running = false; if(this.video?.srcObject) this.video.srcObject.getTracks().forEach(t=>t.stop()); }
+        };
+
+        const Competition = {
+            teams: [], currentIndex: 0, maxTeams: 10, started: false,
+
+            async init() {
+                const saved = await Storage.get('config', 'competitionTeams');
+                const names = Array.isArray(saved) && saved.length ? saved : ['NHÓM 1','NHÓM 2','NHÓM 3','NHÓM 4'];
+                this.teams = names.slice(0, this.maxTeams).map((name, i) => ({
+                    id: Utils.generateId(), name: String(name || `NHÓM ${i+1}`).trim() || `NHÓM ${i+1}`,
+                    score: null, total: null, timeMs: null, liveScore: 0, liveTimeMs: 0, status: 'waiting'
+                }));
+                this.currentIndex = 0; this.started = false;
+                this.renderSetup(); this.renderScoreboard(); this.updateStartButton();
+            },
+
+            async saveNames() {
+                try { await Storage.set('config', 'competitionTeams', this.teams.map(t => t.name)); } catch(e) {}
+            },
+
+            renderSetup() {
+                const box = Utils.$('team-edit-list'); if(!box) return;
+                box.innerHTML = this.teams.map((t, i) => `
+                    <div class="team-edit-row">
+                        <input type="text" maxlength="30" value="${this.escapeHtml(t.name)}" ${this.started ? 'disabled' : ''}
+                            oninput="window.Competition.renameTeam(${i}, this.value)">
+                        <button type="button" class="team-remove" ${this.started ? 'disabled' : ''} onclick="window.Competition.removeTeam(${i})" title="Xóa đội">✕</button>
+                    </div>`).join('');
+            },
+
+            escapeHtml(value) {
+                return String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+            },
+
+            renameTeam(index, value) {
+                if(this.started || !this.teams[index]) return;
+                this.teams[index].name = String(value || '').slice(0,30);
+                this.renderScoreboard(); this.saveNames(); this.updateStartButton();
+            },
+
+            addTeamFromInput() {
+                if(this.started) return;
+                if(this.teams.length >= this.maxTeams) return Utils.toast(`Tối đa ${this.maxTeams} đội`, 'error');
+                const input = Utils.$('new-team-name');
+                const fallback = `NHÓM ${this.teams.length + 1}`;
+                const name = (input.value || '').trim() || fallback;
+                this.teams.push({ id: Utils.generateId(), name, score:null, total:null, timeMs:null, liveScore:0, liveTimeMs:0, status:'waiting' });
+                input.value = ''; this.renderSetup(); this.renderScoreboard(); this.saveNames(); this.updateStartButton();
+            },
+
+            removeTeam(index) {
+                if(this.started) return;
+                if(this.teams.length <= 1) return Utils.toast('Cần ít nhất 1 đội', 'error');
+                this.teams.splice(index,1);
+                this.renderSetup(); this.renderScoreboard(); this.saveNames(); this.updateStartButton();
+            },
+
+            updateStartButton() {
+                const btn = Utils.$('btn-start-game'); if(!btn) return;
+                const validNames = this.teams.length > 0 && this.teams.every(t => t.name.trim());
+                btn.disabled = !(Game.currentSet && validNames);
+                if(!this.started) btn.innerText = '▶ BẮT ĐẦU THI ĐẤU';
+            },
+
+            getCurrentTeam() { return this.teams[this.currentIndex] || null; },
+
+            begin() {
+                if(!this.teams.length) return false;
+                if(!this.started) {
+                    this.started = true; this.currentIndex = 0;
+                    this.teams.forEach(t => Object.assign(t, {score:null,total:null,timeMs:null,liveScore:0,liveTimeMs:0,status:'waiting'}));
+                    this.renderSetup();
+                }
+                const t = this.getCurrentTeam();
+                if(!t) return false;
+                t.status = 'playing'; t.liveScore = 0; t.liveTimeMs = 0;
+                this.renderScoreboard(); this.updateHeader();
+                return true;
+            },
+
+            updateHeader() {
+                const t = this.getCurrentTeam();
+                const el = Utils.$('current-team-pill');
+                if(el) el.innerText = t ? `👥 ${t.name}` : '👥 Hoàn tất';
+            },
+
+            updateLiveTime(ms) {
+                const t = this.getCurrentTeam();
+                if(!t || t.status !== 'playing') return;
+                t.liveTimeMs = ms;
+                const row = document.querySelector(`[data-team-id="${t.id}"] .score-time`);
+                if(row) row.textContent = Game.formatTimeShort(ms);
+            },
+
+            updateLiveScore(score, total) {
+                const t = this.getCurrentTeam();
+                if(!t || t.status !== 'playing') return;
+                t.liveScore = score; t.total = total;
+                this.renderScoreboard();
+            },
+
+            recordResult(score, total, timeMs) {
+                const t = this.getCurrentTeam(); if(!t) return;
+                t.score = score; t.total = total; t.timeMs = timeMs; t.liveScore = score; t.liveTimeMs = timeMs; t.status = 'done';
+                this.renderScoreboard();
+            },
+
+            hasNextTeam() { return this.currentIndex < this.teams.length - 1; },
+
+            nextTeam() {
+                if(!this.hasNextTeam()) return;
+                this.currentIndex++;
+                Utils.$('message-overlay').classList.add('hidden');
+                Utils.$('btn-manual-next').classList.add('hidden');
+                Utils.$('msg-actions').innerHTML = '';
+                this.begin();
+                Game.startSession(true);
+            },
+
+            ranking() {
+                return this.teams.filter(t => t.status === 'done').slice().sort((a,b) => {
+                    if((b.score ?? -1) !== (a.score ?? -1)) return (b.score ?? -1) - (a.score ?? -1);
+                    return (a.timeMs ?? Infinity) - (b.timeMs ?? Infinity);
+                });
+            },
+
+            displayOrder() {
+                const done = this.ranking();
+                const active = this.teams.filter(t => t.status === 'playing');
+                const waiting = this.teams.filter(t => t.status === 'waiting');
+                return [...done, ...active, ...waiting];
+            },
+
+            rankBadge(index) { return index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : String(index + 1); },
+
+            renderScoreboard() {
+                const box = Utils.$('scoreboard-rows'); if(!box) return;
+                const ordered = this.displayOrder();
+                box.innerHTML = ordered.map((t, idx) => {
+                    const active = t.status === 'playing'; const done = t.status === 'done';
+                    const score = done ? `${t.score}/${t.total}` : active ? `${t.liveScore}/${t.total || (Game.questions?.length || '—')}` : '—';
+                    const time = done ? Game.formatTimeShort(t.timeMs) : active ? Game.formatTimeShort(t.liveTimeMs) : '—';
+                    const rank = done ? this.rankBadge(idx) : active ? '▶' : '•';
+                    return `<div class="score-row ${active ? 'active' : ''} ${done ? 'done' : ''}" data-team-id="${t.id}">
+                        <div class="score-rank">${rank}</div>
+                        <div style="min-width:0"><div class="score-name">${this.escapeHtml(t.name)}</div><div class="score-status">${done ? 'Đã hoàn thành' : active ? 'Đang thi đấu' : 'Chờ lượt'}</div></div>
+                        <div class="score-points">${score}</div>
+                        <div class="score-time">${time}</div>
+                    </div>`;
+                }).join('');
+            },
+
+            renderFinalRanking() {
+                const ranked = this.ranking();
+                return `<div class="final-ranking">
+                    ${ranked.map((t,i) => `<div class="final-rank-row ${i===0?'winner':''}">
+                        <div style="font-size:1.45rem;text-align:center">${this.rankBadge(i)}</div>
+                        <div>${this.escapeHtml(t.name)}</div>
+                        <div style="color:#f59e0b;text-align:center">${t.score}/${t.total} điểm</div>
+                        <div style="color:#0891b2;text-align:right">⏱ ${Game.formatTimeShort(t.timeMs)}</div>
+                    </div>`).join('')}
+                </div>`;
+            },
+
+            resetCompetition() {
+                AudioSvc.stopBGM();
+                this.started = false; this.currentIndex = 0;
+                this.teams.forEach(t => Object.assign(t,{score:null,total:null,timeMs:null,liveScore:0,liveTimeMs:0,status:'waiting'}));
+                Game.state = STATES.IDLE; Game.session = null; Game.qIndex = 0;
+                Utils.$('message-overlay').classList.add('hidden');
+                Utils.$('start-overlay').classList.remove('hidden');
+                Utils.$('team-timer').innerText = '⏱️ 00:00.000';
+                Utils.$('current-team-pill').innerText = '👥 Chưa bắt đầu';
+                this.renderSetup(); this.renderScoreboard(); this.updateStartButton();
+            }
+        };
+
+        const Game = {
+            state: STATES.IDLE, currentSet: null, questions: [], qIndex: 0, session: null,
+            neutralRoll: 0, calibSamples: [], calibStartTime: 0, holdStartTime: 0, currentChoice: null, noFaceTimer: 0,
+            timerRAF: 0,
+
+            init() {
+                document.addEventListener('keydown', (e) => {
+                    if(e.code === 'Space' && this.state === STATES.WAITING_EXIT && !App.settings.autoNext) this.manualNext();
+                    if((e.key === 'A' || e.key === 'a') && (this.state === STATES.READY || this.state === STATES.IDLE)) this.submitAnswer('A', 'key');
+                    if((e.key === 'B' || e.key === 'b') && (this.state === STATES.READY || this.state === STATES.IDLE)) this.submitAnswer('B', 'key');
+                });
+            },
+
+            formatTime(ms) {
+                ms = Math.max(0, ms || 0);
+                const min = Math.floor(ms / 60000);
+                const sec = Math.floor((ms % 60000) / 1000);
+                const milli = Math.floor(ms % 1000);
+                return `${String(min).padStart(2,'0')}:${String(sec).padStart(2,'0')}.${String(milli).padStart(3,'0')}`;
+            },
+
+            formatTimeShort(ms) {
+                ms = Math.max(0, ms || 0);
+                const min = Math.floor(ms / 60000);
+                const sec = Math.floor((ms % 60000) / 1000);
+                const tenth = Math.floor((ms % 1000) / 100);
+                return `${String(min).padStart(2,'0')}:${String(sec).padStart(2,'0')}.${tenth}`;
+            },
+
+            startTeamTimer() {
+                cancelAnimationFrame(this.timerRAF);
+                const tick = () => {
+                    if(!this.session || this.state === STATES.ENDED) return;
+                    const elapsed = Date.now() - this.session.startedAt;
+                    Utils.$('team-timer').innerText = `⏱️ ${this.formatTime(elapsed)}`;
+                    Competition.updateLiveTime(elapsed);
+                    this.timerRAF = requestAnimationFrame(tick);
+                };
+                tick();
+            },
+
+            async startSession(fromNextTeam = false) {
+                if(!this.currentSet) return;
+                if(!fromNextTeam && !Competition.begin()) return Utils.toast('Hãy tạo ít nhất 1 đội', 'error');
+
+                AudioSvc.init(); 
+                AudioSvc.startBGM(); // Kích hoạt nhạc nền khi bắt đầu chạy bộ câu hỏi
+                this.questions = Utils.deepClone(this.currentSet.questions);
+                if(this.questions.length === 0) return Utils.toast("Bộ câu hỏi trống", "error");
+
+                const team = Competition.getCurrentTeam();
+                this.session = { id: Utils.generateId(), setId: this.currentSet.id, setName: this.currentSet.name, teamId: team?.id || null, teamName: team?.name || 'Đội', startedAt: Date.now(), answers: [] };
+                Utils.$('team-timer').innerText = '⏱️ 00:00.000';
+                this.startTeamTimer();
+                Utils.$('start-overlay').classList.add('hidden');
+                this.qIndex = 0;
+                this.prepareNextQuestion();
+            },
+
+            renderCurrentQuestion() {
+                if(this.qIndex >= this.questions.length) return false;
+                this.resetUI();
+                const q = this.questions[this.qIndex];
+                Utils.$('q-meta').innerText = `Câu ${this.qIndex + 1} / ${this.questions.length}`;
+                Utils.$('q-text').innerText = q.q;
+                Utils.$('text-a').innerText = q.a || '';
+                Utils.$('text-b').innerText = q.b || '';
+                const imgA = Utils.$('img-a'), imgB = Utils.$('img-b');
+                const btnA = Utils.$('ans-a'), btnB = Utils.$('ans-b');
+                if(q.imageA) { imgA.src = q.imageA; imgA.classList.remove('hidden'); btnA.classList.add('has-image'); }
+                else { imgA.removeAttribute('src'); imgA.classList.add('hidden'); btnA.classList.remove('has-image'); }
+                if(q.imageB) { imgB.src = q.imageB; imgB.classList.remove('hidden'); btnB.classList.add('has-image'); }
+                else { imgB.removeAttribute('src'); imgB.classList.add('hidden'); btnB.classList.remove('has-image'); }
+                return true;
+            },
+
+            prepareNextQuestion() {
+                if(!this.renderCurrentQuestion()) return this.endSession();
+                this.changeState(STATES.WAITING_PLAYER);
+            },
+
+            prepareRelayHandoff() {
+                this.qIndex++;
+                if(this.qIndex >= this.questions.length) return this.endSession();
+                this.renderCurrentQuestion();
+                this.changeState(STATES.WAITING_EXIT);
+                Utils.$('cam-state-text').innerText = '🔄 CHUYỂN CÂU!';
+                Utils.$('cam-angle-text').innerText = 'Giữ đầu thẳng lại để làm câu tiếp theo';
+            },
+
+            changeState(newState) {
+                this.state = newState;
+                const txt = Utils.$('cam-state-text');
+                const sub = Utils.$('cam-angle-text');
+                switch(newState) {
+                    case STATES.WAITING_PLAYER:
+                        txt.innerText = "Sẵn sàng nhé!"; sub.innerText = "Câu hỏi đã tải xong"; txt.style.color = 'var(--text-muted)';
+                        this.neutralRoll = 0; this.calibSamples = []; this.resetHold(); break;
+                    case STATES.CALIBRATING:
+                        txt.innerText = "Sẵn sàng..."; sub.innerText = "Nhìn thẳng — AI bắt mốc tự động"; txt.style.color = '#f59e0b';
+                        this.calibSamples = []; this.calibStartTime = performance.now(); this.resetHold(); break;
+                    case STATES.READY: txt.innerText = "Sẵn sàng!"; sub.innerText = "Nghiêng nhẹ đầu để chọn"; txt.style.color = 'var(--success)'; AudioSvc.play('ready'); break;
+                    case STATES.HOLDING: txt.innerText = `${this.currentChoice === 'A' ? '← Đang nghiêng TRÁI' : 'Đang nghiêng PHẢI →'}`; sub.innerText = "Giữ nguyên..."; txt.style.color = 'var(--primary)'; break;
+                    case STATES.LOCKED: txt.innerText = "Đã chốt đáp án!"; sub.innerText = ""; break;
+                    case STATES.WAITING_EXIT: txt.innerText = "Hoàn thành!"; sub.innerText = App.settings.autoNext ? "Vui lòng giữ đầu thẳng lại để tiếp tục" : "Bấm Space để tiếp tục"; txt.style.color = '#f59e0b'; break;
+                }
+            },
+
+            onFaceStateChange(status, roll) {
+                if(this.state === STATES.ENDED || this.state === STATES.LOCKED) return;
+                const now = performance.now();
+                const isTesting = (this.state === STATES.IDLE);
+
+                if(status === 'MULTIPLE') {
+                    Utils.$('cam-state-text').innerText = "⚠️ Chỉ 1 người trong khung hình!";
+                    Utils.$('cam-angle-text').innerText = "Vui lòng để người khác đứng ngoài vùng camera";
+                    this.resetHold();
+                    if (this.state === STATES.CALIBRATING) { this.calibSamples = []; this.calibStartTime = now; }
+                    return;
+                }
+
+                if(status === 'NONE') {
+                    if (this.noFaceTimer === 0) this.noFaceTimer = now;
+                    if (now - this.noFaceTimer > 280) {
+                        if (!isTesting && this.state !== STATES.WAITING_PLAYER) {
+                            this.resetHold(); this.changeState(STATES.WAITING_PLAYER);
+                        } else if (isTesting) { 
+                            this.resetHold(); Utils.$('cam-state-text').innerText = "Không thấy ai..."; 
+                        }
+                    }
+                    return;
+                }
+
+                this.noFaceTimer = 0;
+                
+                if(this.state === STATES.WAITING_PLAYER) {
+                    // Mỗi học sinh mới phải hiệu chuẩn tư thế đầu thẳng trước khi được trả lời
+                    this.changeState(STATES.CALIBRATING);
+                }
+                else if(this.state === STATES.CALIBRATING) {
+                    // Chỉ lấy mẫu khi có đúng 1 khuôn mặt. Nếu đầu rung quá mạnh, bộ mẫu tự kéo dài đến khi ổn định.
+                    this.calibSamples.push(roll);
+                    const elapsed = now - this.calibStartTime;
+                    const target = Math.max(150, App.settings.calibTime || 190);
+                    const pct = Math.min(100, (elapsed / target) * 100);
+                    UI.updateProgress('CALIB', pct);
+
+                    if (elapsed >= target && this.calibSamples.length >= 4) {
+                        // Dùng trung vị để chống vài frame nhiễu làm lệch mốc 0°
+                        const sorted = [...this.calibSamples].sort((a,b)=>a-b);
+                        const mid = Math.floor(sorted.length/2);
+                        const median = sorted.length % 2 ? sorted[mid] : (sorted[mid-1] + sorted[mid]) / 2;
+                        const deviations = sorted.map(v => Math.abs(v - median)).sort((a,b)=>a-b);
+                        const dmid = Math.floor(deviations.length/2);
+                        const mad = deviations.length % 2 ? deviations[dmid] : (deviations[dmid-1] + deviations[dmid]) / 2;
+
+                        // Nếu học sinh đang di chuyển/đang nghiêng trong lúc hiệu chuẩn, lấy lại mốc thay vì cho chơi ngay.
+                        if (mad > 4.2) {
+                            this.calibSamples = [];
+                            this.calibStartTime = now;
+                            Utils.$('cam-state-text').innerText = "Sẵn sàng...";
+                            Utils.$('cam-angle-text').innerText = "Nhìn thẳng để AI bắt mốc";
+                            UI.updateProgress('A', 0);
+                        } else {
+                            this.neutralRoll = median;
+                            this.resetHold();
+                            UI.updateProgress('A', 0);
+                            this.changeState(STATES.READY);
+                        }
+                    }
+                }
+                else if(this.state === STATES.READY || this.state === STATES.HOLDING || isTesting) {
+                    // Preview camera đang mirror bằng scaleX(-1), vì vậy đảo dấu roll để hướng trên màn hình khớp ô TRÁI/PHẢI.
+                    const relativeRoll = isTesting ? -roll : -(roll - this.neutralRoll); 
+                    const thresh = App.settings.tiltThreshold;
+                    let intention = null;
+                    
+                    if ((this.state === STATES.HOLDING || isTesting) && this.currentChoice) {
+                        const holdThresh = thresh * 0.75; 
+                        if (this.currentChoice === 'A' && relativeRoll < -holdThresh) intention = 'A';
+                        else if (this.currentChoice === 'B' && relativeRoll > holdThresh) intention = 'B';
+                    }
+                    
+                    if (!intention) {
+                        if(relativeRoll < -thresh) intention = 'A';
+                        else if(relativeRoll > thresh) intention = 'B';
+                    }
+
+                    if(intention) {
+                        if((this.state === STATES.READY || isTesting) && this.currentChoice !== intention) {
+                            this.currentChoice = intention; this.holdStartTime = now;
+                            if(isTesting) Utils.$('cam-state-text').innerText = intention === 'A' ? '← Đang test nghiêng TRÁI' : 'Đang test nghiêng PHẢI →';
+                            else this.changeState(STATES.HOLDING); 
+                            AudioSvc.play('tick');
+                        } else if (this.holdStartTime > 0) {
+                            // Nghiêng dứt khoát thì chốt nhanh hơn; nghiêng sát ngưỡng vẫn giữ chống nhầm.
+                            const strongTilt = Math.abs(relativeRoll) >= thresh * 1.55;
+                            const effectiveHold = strongTilt ? Math.max(220, App.settings.holdTime * 0.65) : App.settings.holdTime;
+                            const progress = Math.min(100, ((now - this.holdStartTime) / effectiveHold) * 100);
+                            UI.updateProgress(intention, progress);
+                            
+                            if(progress >= 100) {
+                                if(isTesting) { this.resetHold(); } 
+                                else { this.submitAnswer(intention, 'camera'); }
+                            }
+                        }
+                    } else if(this.state === STATES.HOLDING || isTesting) { 
+                        this.resetHold(); 
+                        if(isTesting) Utils.$('cam-state-text').innerText = "Thẳng đầu (Sẵn sàng Test)";
+                        else this.changeState(STATES.READY); 
+                    }
+                }
+            },
+
+            resetHold() { this.holdStartTime = 0; this.currentChoice = null; UI.updateProgress('A', 0); },
+
+            async submitAnswer(choice, mode) {
+                if(this.state === STATES.IDLE) return Utils.toast(`Đã nhận tín hiệu ${choice} (Đang test)`);
+                if(this.state !== STATES.READY && this.state !== STATES.HOLDING) return;
+                this.changeState(STATES.LOCKED); 
+                
+                const q = this.questions[this.qIndex];
+                choice = String(choice || '').trim().toUpperCase();
+                const correctChoice = String(q.correct || '').trim().toUpperCase();
+                if (!['A','B'].includes(choice) || !['A','B'].includes(correctChoice)) {
+                    console.error('Dữ liệu đáp án không hợp lệ', { choice, correct: q.correct, q });
+                    this.changeState(STATES.READY);
+                    return Utils.toast('Lỗi dữ liệu đáp án của câu hỏi', 'error');
+                }
+                const isCorrect = choice === correctChoice;
+                this.session.answers.push({ qId: q.id, choice, correct: correctChoice, isCorrect, mode, time: Date.now(), neutralRoll: this.neutralRoll });
+                console.log('[ANSWER]', { mode, choice, correct: correctChoice, isCorrect, neutralRoll: this.neutralRoll });
+
+                UI.updateProgress('A', 0); 
+                const btnChosen = Utils.$(`ans-${choice.toLowerCase()}`);
+                const btnCorrect = Utils.$(`ans-${correctChoice.toLowerCase()}`);
+                
+                btnChosen.classList.add(isCorrect ? 'correct' : 'wrong');
+                if(!isCorrect) btnCorrect.classList.add('correct');
+                AudioSvc.play(isCorrect ? 'correct' : 'wrong');
+                Competition.updateLiveScore(this.session.answers.filter(a => a.isCorrect).length, this.questions.length);
+
+                // KÍCH HOẠT HIỆU ỨNG PHÁO HOA NẾU TRẢ LỜI ĐÚNG
+                if (isCorrect && window.confetti) {
+                    window.confetti({
+                        particleCount: 150,
+                        spread: 90,
+                        origin: { y: 0.55 },
+                        zIndex: 9999
+                    });
+                }
+
+                // Phản hồi đủ để nhận biết đúng/sai nhưng không phá nhịp tiếp sức.
+                await new Promise(r => setTimeout(r, 550));
+
+                // HIỆN BẢNG THÔNG BÁO VÀ NÚT CHUYỂN CÂU CHO HS KHÁC
+                this.changeState(STATES.WAITING_EXIT);
+                Utils.$('msg-title').innerText = isCorrect ? "🎉 CHÍNH XÁC!" : "❌ SAI RỒI!";
+                Utils.$('msg-desc').innerText = "Mời bạn tiếp theo bước lên và bấm nút để tiếp tục.";
+                Utils.$('btn-manual-next').innerText = "▶ CÂU TIẾP THEO";
+                Utils.$('message-overlay').classList.remove('hidden');
+                Utils.$('btn-manual-next').classList.remove('hidden');
+            },
+
+            manualNext() {
+                if(this.state !== STATES.WAITING_EXIT) return;
+                Utils.$('message-overlay').classList.add('hidden');
+                this.qIndex++; this.prepareNextQuestion();
+            },
+
+            async endSession() {
+                this.changeState(STATES.ENDED);
+                AudioSvc.stopBGM(); // Tắt nhạc khi xong toàn bộ
+                this.session.endedAt = Date.now();
+                this.session.totalTimeMs = this.session.endedAt - this.session.startedAt;
+                cancelAnimationFrame(this.timerRAF);
+                Utils.$('team-timer').innerText = `⏱️ ${this.formatTime(this.session.totalTimeMs)}`;
+
+                const correct = this.session.answers.filter(a => a.isCorrect).length;
+                this.session.score = correct;
+                this.session.totalQuestions = this.questions.length;
+                Competition.recordResult(correct, this.questions.length, this.session.totalTimeMs);
+                await Storage.set('sessions', this.session);
+
+                const team = Competition.getCurrentTeam();
+                Utils.$('btn-manual-next').classList.add('hidden');
+
+                if(Competition.hasNextTeam()) {
+                    const next = Competition.teams[Competition.currentIndex + 1];
+                    Utils.$('msg-title').innerText = `🏁 ${team?.name || 'ĐỘI'} HOÀN THÀNH!`;
+                    Utils.$('msg-desc').innerHTML = `<div style="background:white; padding:20px 28px; border-radius:20px; color:var(--text-dark);">
+                        <h3>Điểm: <span style="color:var(--primary); font-size:2rem;">${correct}/${this.questions.length}</span></h3>
+                        <h3 style="margin-top:10px;">⏱️ Thời gian: <span style="color:#f59e0b; font-size:2rem;">${this.formatTime(this.session.totalTimeMs)}</span></h3>
+                        <p style="margin:12px 0 0;font-size:1rem;color:#64748b">Kết quả đã được đưa lên bảng điểm bên phải.</p>
+                    </div>`;
+                    Utils.$('msg-actions').innerHTML = `<button class="btn" style="font-size:1.18rem;padding:13px 28px;background:#16a34a" onclick="window.Competition.nextTeam()">🏃 MỜI ${Competition.escapeHtml(next.name)} VÀO THI</button>`;
+                } else {
+                    Utils.$('msg-title').innerText = '🏆 KẾT QUẢ CHUNG CUỘC';
+                    Utils.$('msg-desc').innerHTML = `<div style="font-size:1.05rem;font-weight:800;color:#475569">Xếp hạng theo <b>điểm cao nhất</b>; nếu hòa điểm, đội có <b>thời gian ngắn hơn</b> xếp trên.</div>${Competition.renderFinalRanking()}`;
+                    Utils.$('msg-actions').innerHTML = `<button class="btn" style="font-size:1.12rem;padding:12px 26px" onclick="window.Competition.resetCompetition()">🔄 THI ĐẤU LẠI</button>`;
+                    Competition.updateHeader();
+                }
+                Utils.$('message-overlay').classList.remove('hidden');
+            },
+
+            resetUI() {
+                ['a','b'].forEach(x => {
+                    const el = Utils.$(`ans-${x}`);
+                    el.classList.remove('correct', 'wrong', 'active');
+                });
+                Utils.$('status-progress').style.width = '0%';
+            },
+
+            toggleFullscreen() {
+                if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(e => console.warn(e));
+                else if (document.exitFullscreen) document.exitFullscreen();
+            }
+        };
+
+        const UI = {
+            updateProgress(choice, pct) {
+                const bar = Utils.$('status-progress');
+                bar.style.width = pct + '%';
+                
+                if (pct > 0) {
+                    if (choice === 'A') bar.style.backgroundColor = 'var(--primary)';
+                    if (choice === 'B') bar.style.backgroundColor = 'var(--success)';
+                    if (choice === 'CALIB') bar.style.backgroundColor = '#f59e0b';
+                } else {
+                    bar.style.width = '0%';
+                }
+                
+                ['a','b'].forEach(x => Utils.$(`ans-${x}`).classList.remove('active'));
+                if(pct > 0 && (choice === 'A' || choice === 'B')) Utils.$(`ans-${choice.toLowerCase()}`).classList.add('active');
+            },
+            showSetsModal() {
+                if(Game.state !== STATES.IDLE) return Utils.toast("Game đang chạy", "warning");
+                Utils.$('select-set-modal').classList.remove('hidden'); Admin.renderMiniSetsList();
+            },
+            hideSetsModal() { Utils.$('select-set-modal').classList.add('hidden'); },
+            selectSet(id) {
+                Storage.get('sets', id).then(set => {
+                    Game.currentSet = set;
+                    Utils.$('start-title').innerText = set.name;
+                    Utils.$('start-desc').innerText = `Bộ này có ${set.questions.length} câu hỏi.`;
+                    Competition.updateStartButton();
+                    this.hideSetsModal(); Utils.toast(`Đã chọn: ${set.name}`);
+                });
+            }
+        };
+
+       const Admin = {
+            openAuth() { 
+                if(Game.state !== STATES.IDLE && Game.state !== STATES.ENDED) return Utils.toast("Không thể vào quản trị lúc này", "warning");
+                Utils.$('auth-modal').classList.remove('hidden'); Utils.$('auth-pass').value = ''; Utils.$('auth-pass').focus(); 
+            },
+            closeAuth() { Utils.$('auth-modal').classList.add('hidden'); },
+            login() {
+                if(Utils.$('auth-pass').value === 'Hoahoc12') {
+                    this.closeAuth(); Utils.$('admin-modal').classList.remove('hidden'); this.loadSets();
+                } else Utils.toast("Mật khẩu sai!", "error");
+            },
+            close() { Utils.$('admin-modal').classList.add('hidden'); },
+            switchTab(tabId) {
+                this.activateTab(tabId, event?.target || null);
+            },
+            activateTab(tabId, button = null) {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+                const targetBtn = button || Array.from(document.querySelectorAll('.tab-btn')).find(b => (b.getAttribute('onclick') || '').includes(`'${tabId}'`));
+                if(targetBtn) targetBtn.classList.add('active');
+                const panel = Utils.$(tabId); if(panel) panel.classList.add('active');
+            },
+            async loadSets() {
+                const sets = await Storage.getAll('sets'); const list = Utils.$('sets-list-container');
+                if(sets.length === 0) list.innerHTML = '<p>Chưa có bộ câu hỏi nào.</p>';
+                else {
+                    list.innerHTML = sets.map(s => `
+                        <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
+                            <div><strong>${s.name}</strong> <br><small>${s.questions.length} câu | Tạo: ${new Date(s.createdAt).toLocaleDateString()}</small></div>
+                            <div style="display:flex; gap:8px;"><button class="btn btn-sm" onclick="window.QuestionBuilder.loadSet('${s.id}')">✏️ Sửa</button><button class="btn btn-sm btn-danger" onclick="window.Admin.deleteSet('${s.id}')">Xóa</button></div>
+                        </div>`).join('');
+                }
+            },
+            async renderMiniSetsList() {
+                const sets = await Storage.getAll('sets'); const list = Utils.$('modal-sets-list');
+                if(sets.length===0) list.innerHTML = 'Chưa có dữ liệu. Hãy vào Quản trị để nhập Word hoặc tự tạo câu hỏi.';
+                else list.innerHTML = sets.map(s => `
+                    <div style="padding: 15px; border-bottom: 1px solid #e2e8f0; display:flex; justify-content:space-between;">
+                        <span style="font-size: 1.1rem; font-weight: 800;">${s.name} (${s.questions.length} câu)</span>
+                        <button class="btn btn-sm" onclick="window.UI.selectSet('${s.id}')">Chọn</button>
+                    </div>`).join('');
+            },
+            async deleteSet(id) { if(!confirm("Chắc chắn xóa?")) return; await Storage.delete('sets', id); this.loadSets(); Utils.toast("Đã xóa"); },
+            
+            loadSettingsUI() {
+                Utils.$('set-threshold').value = App.settings.tiltThreshold; Utils.$('set-hold').value = App.settings.holdTime;
+                Utils.$('set-calib').value = App.settings.calibTime; Utils.$('set-autonext').value = App.settings.autoNext.toString();
+                Utils.$('set-sound').value = App.settings.sound.toString();
+                Utils.$('set-bg').value = ''; Utils.$('set-sound-bgm').value = ''; Utils.$('set-sound-correct').value = ''; Utils.$('set-sound-wrong').value = '';
+            },
+            async saveSettings() {
+                Utils.toast("Đang lưu cài đặt...");
+                let bgFile = Utils.$('set-bg').files[0];
+                let bgmFile = Utils.$('set-sound-bgm').files[0];
+                let correctFile = Utils.$('set-sound-correct').files[0];
+                let wrongFile = Utils.$('set-sound-wrong').files[0];
+
+                let bgData = bgFile ? await Utils.fileToBase64(bgFile) : App.settings.bgImage;
+                let bgmData = bgmFile ? await Utils.fileToBase64(bgmFile) : App.settings.soundBgm;
+                let correctData = correctFile ? await Utils.fileToBase64(correctFile) : App.settings.soundCorrect;
+                let wrongData = wrongFile ? await Utils.fileToBase64(wrongFile) : App.settings.soundWrong;
+
+                App.settings = { ...App.settings, tiltThreshold: parseInt(Utils.$('set-threshold').value), holdTime: parseInt(Utils.$('set-hold').value),
+                    calibTime: parseInt(Utils.$('set-calib').value), autoNext: Utils.$('set-autonext').value === 'true', sound: Utils.$('set-sound').value === 'true',
+                    bgImage: bgData, soundBgm: bgmData, soundCorrect: correctData, soundWrong: wrongData };
+                
+                if (bgData) document.body.style.backgroundImage = `url(${bgData})`;
+                
+                await Storage.set('config', 'settings', App.settings); 
+                Utils.toast("Đã lưu cài đặt thành công");
+            },
+            async resetSettings() { App.settings = Utils.deepClone(App.defaultSettings); this.loadSettingsUI(); await this.saveSettings(); }
+        };
+
+        const App = {
+            defaultSettings: { tiltThreshold: 11, holdTime: 360, calibTime: 190, autoNext: true, sound: true, bgImage: '', soundBgm: '', soundCorrect: '', soundWrong: '' },
+            settings: {},
+            async init() {
+                await Storage.init();
+                
+                const savedSet = await Storage.get('config', 'settings');
+                this.settings = savedSet || Utils.deepClone(this.defaultSettings);
+
+                // Tự nâng cấu hình cũ của bản sửa trước sang nhịp chơi nhanh hơn.
+                // Chỉ đổi đúng các giá trị mặc định cũ; nếu giáo viên đã tự chỉnh số khác thì giữ nguyên.
+                let migratedFastTiming = false;
+                if (savedSet && [650,420].includes(this.settings.holdTime)) { this.settings.holdTime = 360; migratedFastTiming = true; }
+                if (savedSet && [900,350].includes(this.settings.calibTime)) { this.settings.calibTime = 190; migratedFastTiming = true; }
+                if (savedSet && this.settings.tiltThreshold === 12) { this.settings.tiltThreshold = 11; migratedFastTiming = true; }
+                if (migratedFastTiming) await Storage.set('config', 'settings', this.settings);
+                
+                if (this.settings.bgImage) {
+                    document.body.style.backgroundImage = `url(${this.settings.bgImage})`;
+                    document.body.style.backgroundSize = "cover";
+                    document.body.style.backgroundPosition = "center";
+                }
+
+                await Competition.init();
+                Admin.loadSettingsUI(); Game.init(); FaceTracker.init(); 
+            }
+        };
+        // GẮN BIẾN TOÀN CỤC ĐỂ GIAO DIỆN HTML GỌI ĐƯỢC KHI DÙNG MODULE
+        window.Utils = Utils;
+        window.AudioSvc = AudioSvc;
+        window.Storage = Storage;
+        window.WordParser = WordParser;
+        window.QuestionBuilder = QuestionBuilder;
+        window.FaceTracker = FaceTracker;
+        window.Competition = Competition;
+        window.Game = Game;
+        window.UI = UI;
+        window.Admin = Admin;
+        window.App = App;
+
+        window.addEventListener('DOMContentLoaded', () => {
+            App.init();
+            QuestionBuilder.renderDraft();
+            const addOnEnter = () => {
+                const inp = Utils.$('new-team-name');
+                if(inp) inp.addEventListener('keydown', e => { if(e.key === 'Enter') Competition.addTeamFromInput(); });
+            };
+            setTimeout(addOnEnter, 0);
+        });
+        document.addEventListener("visibilitychange", () => { if (document.hidden && Game.state === STATES.HOLDING) { Game.resetHold(); Game.changeState(STATES.READY); } });
+
+    </script>
+</body>
+</html>
